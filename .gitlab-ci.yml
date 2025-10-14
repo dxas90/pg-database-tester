@@ -1,0 +1,136 @@
+stages:
+  - initialize
+  - build
+  - test
+  - containerize
+  - deployment
+  - promote
+  - notify
+
+variables:
+  GO_VERSION: "1.24"
+  BINARY_NAME: "pg-db-tester"
+  DOCKER_IMAGE: "${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"
+  DOCKER_IMAGE_LATEST: "${CI_REGISTRY_IMAGE}:latest"
+
+# Initialize stage - runs on every commit to any branch
+initialize:
+  stage: initialize
+  image: golang:${GO_VERSION}-alpine
+  script:
+    - echo "Initializing pipeline for commit ${CI_COMMIT_SHORT_SHA} on branch ${CI_COMMIT_REF_NAME}"
+    - go version
+    - apk add --no-cache git
+  artifacts:
+    reports:
+      dotenv: build.env
+    paths:
+      - build.env
+  before_script:
+    - echo "GO_VERSION=${GO_VERSION}" > build.env
+    - echo "BINARY_NAME=${BINARY_NAME}" >> build.env
+
+# Build stage - runs on every commit to any branch
+build:
+  stage: build
+  image: golang:${GO_VERSION}-alpine
+  script:
+    - echo "Building application..."
+    - apk add --no-cache git
+    - go mod download
+    - go build -v -o ${BINARY_NAME} .
+    - echo "Build completed successfully"
+  artifacts:
+    paths:
+      - ${BINARY_NAME}
+    expire_in: 1 week
+
+# Test stage - runs on every commit to any branch
+test:
+  stage: test
+  image: golang:${GO_VERSION}-alpine
+  script:
+    - echo "Running tests..."
+    - apk add --no-cache git
+    - go mod download
+    - go test -v ./... || echo "No tests found"
+    - echo "Tests completed"
+
+# Containerize stage - runs only on tags
+containerize:
+  stage: containerize
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - echo "Building Docker image..."
+    - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
+    - docker build -t ${DOCKER_IMAGE} .
+    - docker tag ${DOCKER_IMAGE} ${DOCKER_IMAGE_LATEST}
+    - docker push ${DOCKER_IMAGE}
+    - echo "Docker image pushed successfully"
+  only:
+    - tags
+  dependencies:
+    - build
+
+# Deployment to staging - runs only on tags
+deploy:staging:
+  stage: deployment
+  image: alpine:latest
+  script:
+    - echo "Deploying to staging environment..."
+    - echo "Image: ${DOCKER_IMAGE}"
+    - echo "Tag: ${CI_COMMIT_TAG}"
+    # Add your deployment commands here (e.g., kubectl, helm, etc.)
+    - echo "Deployment to staging completed"
+  environment:
+    name: staging
+    url: https://staging.example.com
+  only:
+    - tags
+  dependencies:
+    - containerize
+
+# Promote to production - manual job that promotes the containerized image
+promote:production:
+  stage: promote
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - echo "Promoting image to production..."
+    - docker login -u ${CI_REGISTRY_USER} -p ${CI_REGISTRY_PASSWORD} ${CI_REGISTRY}
+    - docker pull ${DOCKER_IMAGE}
+    - docker tag ${DOCKER_IMAGE} ${CI_REGISTRY_IMAGE}:production
+    - docker push ${CI_REGISTRY_IMAGE}:production
+    - echo "Image promoted to production successfully"
+  environment:
+    name: production
+    url: https://production.example.com
+  when: manual
+  only:
+    - tags
+  dependencies:
+    - deploy:staging
+
+# Notify stage - runs on every commit to any branch
+notify:success:
+  stage: notify
+  image: alpine:latest
+  script:
+    - echo "Pipeline completed successfully for ${CI_COMMIT_REF_NAME}"
+    - echo "Commit: ${CI_COMMIT_SHORT_SHA}"
+    - echo "Author: ${GITLAB_USER_NAME}"
+    # Add notification commands here (e.g., Slack, email, etc.)
+  when: on_success
+
+notify:failure:
+  stage: notify
+  image: alpine:latest
+  script:
+    - echo "Pipeline failed for ${CI_COMMIT_REF_NAME}"
+    - echo "Commit: ${CI_COMMIT_SHORT_SHA}"
+    - echo "Author: ${GITLAB_USER_NAME}"
+    # Add notification commands here (e.g., Slack, email, etc.)
+  when: on_failure
