@@ -80,8 +80,8 @@ deploy:staging:
   image: alpine:latest
   script:
     - echo "Deploying to staging environment..."
-    - echo "Image: ${DOCKER_IMAGE}"
-    - echo "Tag: ${CI_COMMIT_TAG}"
+    - echo "Image -> ${DOCKER_IMAGE}"
+    - echo "Tag -> ${CI_COMMIT_TAG}"
     # Add your deployment commands here (e.g., kubectl, helm, etc.)
     - echo "Deployment to staging completed"
   environment:
@@ -120,8 +120,8 @@ notify:success:
   image: alpine:latest
   script:
     - echo "Pipeline completed successfully for ${CI_COMMIT_REF_NAME}"
-    - echo "Commit: ${CI_COMMIT_SHORT_SHA}"
-    - echo "Author: ${GITLAB_USER_NAME}"
+    - echo "Commit -> ${CI_COMMIT_SHORT_SHA}"
+    - echo "Author -> ${GITLAB_USER_NAME}"
     # Add notification commands here (e.g., Slack, email, etc.)
   when: on_success
 
@@ -130,7 +130,7 @@ notify:failure:
   image: alpine:latest
   script:
     - echo "Pipeline failed for ${CI_COMMIT_REF_NAME}"
-    - echo "Commit: ${CI_COMMIT_SHORT_SHA}"
-    - echo "Author: ${GITLAB_USER_NAME}"
+    - echo "Commit -> ${CI_COMMIT_SHORT_SHA}"
+    - echo "Author -> ${GITLAB_USER_NAME}"
     # Add notification commands here (e.g., Slack, email, etc.)
   when: on_failure
