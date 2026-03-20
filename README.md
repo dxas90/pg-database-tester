@@ -1,17 +1,18 @@
-# PostgreSQL Database Tester
+# Database Tester
 
-A simple Go application for testing PostgreSQL database connectivity and performing basic queries.
+A simple Go application for testing PostgreSQL and MongoDB database connectivity.
 
 ## Description
 
-This tool connects to a PostgreSQL database and executes a simple query to retrieve the current time from the database server. It's useful for verifying database connectivity, testing connection parameters, and as a minimal example of using GORM with PostgreSQL.
+This tool connects to a PostgreSQL or MongoDB database and verifies connectivity. The database type is auto-detected from the connection URI — no extra configuration needed.
 
 ## Features
 
+- Auto-detect database type from connection URI (`mongodb://`, `mongodb+srv://`, or PostgreSQL)
 - Connect to PostgreSQL using connection string or individual parameters
+- Connect to MongoDB using a URI (standalone, replica set, or Atlas)
 - Support for environment variable configuration
-- Simple health check by querying database time
-- Built with GORM ORM framework
+- Built with GORM (PostgreSQL) and the official MongoDB Go driver v2 (MongoDB)
 
 ## Installation
 
@@ -36,14 +37,26 @@ go build -o pg-db-tester
 
 ## Usage
 
-### Using Full Connection String
+### MongoDB (URI detection is automatic)
+
+```bash
+# Atlas (SRV)
+export DATABASE_URL="mongodb+srv://user:password@cluster.mongodb.net/dbname"
+./pg-db-tester
+
+# Standalone / replica set
+export DATABASE_URL="mongodb://user:password@localhost:27017/dbname"
+./pg-db-tester
+```
+
+### PostgreSQL — Full Connection String
 
 ```bash
 export DATABASE_URL="postgresql://user:password@localhost:5432/dbname?sslmode=disable"
 ./pg-db-tester
 ```
 
-### Using Individual Environment Variables
+### PostgreSQL — Individual Environment Variables
 
 ```bash
 export DB_USER="postgres"
@@ -57,28 +70,41 @@ export DB_SSLMODE="disable"
 
 ## Environment Variables
 
+### Shared
+
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DATABASE_URL` | Full PostgreSQL connection string | - |
+| `DATABASE_URL` | Full connection URI (PostgreSQL or MongoDB) | - |
+
+> When `DATABASE_URL` starts with `mongodb://` or `mongodb+srv://`, MongoDB mode is used automatically.
+> When `DATABASE_URL` is not set, the PostgreSQL individual variables below are used.
+
+### PostgreSQL (individual variables)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
 | `DB_USER` | Database username | `postgres` |
 | `DB_PASSWORD` | Database password | `password` |
 | `DB_HOST` | Database host | `localhost` |
 | `DB_PORT` | Database port | `5432` |
 | `DB_NAME` | Database name | `postgres` |
-| `DB_SSLMODE` | SSL mode (disable, require, verify-ca, verify-full) | `disable` |
-
-**Note:** If `DATABASE_URL` is set, it takes precedence over individual variables.
+| `DB_SSLMODE` | SSL mode (`disable`, `require`, `verify-ca`, `verify-full`) | `disable` |
 
 ## Example Output
 
 ```
+# PostgreSQL
 Current time from DB: 2025-10-10 12:42:27.123456 +0000 UTC
+
+# MongoDB
+Successfully connected to MongoDB
 ```
 
 ## Dependencies
 
-- [GORM](https://gorm.io/) - The fantastic ORM library for Golang
-- [PostgreSQL Driver](https://github.com/jackc/pgx) - PostgreSQL driver and toolkit for Go
+- [GORM](https://gorm.io/) — ORM for PostgreSQL
+- [pgx](https://github.com/jackc/pgx) — PostgreSQL driver
+- [MongoDB Go Driver v2](https://github.com/mongodb/mongo-go-driver) — Official MongoDB driver
 
 ## License
 

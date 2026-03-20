@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -18,11 +22,42 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
+func isMongoURI(uri string) bool {
+	return strings.HasPrefix(uri, "mongodb://") || strings.HasPrefix(uri, "mongodb+srv://")
+}
+
+func connectMongo(uri string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	client, err := mongo.Connect(options.Client().ApplyURI(uri))
+	if err != nil {
+		log.Fatal("failed to connect to MongoDB:", err)
+	}
+	defer client.Disconnect(ctx)
+
+	if err := client.Ping(ctx, nil); err != nil {
+		log.Fatal("failed to ping MongoDB:", err)
+	}
+
+	fmt.Println("Successfully connected to MongoDB")
+}
+
+func connectPostgres(dsn string) {
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatal("failed to connect to database:", err)
+	}
+
+	var now time.Time
+	db.Raw("SELECT NOW()").Scan(&now)
+
+	fmt.Println("Current time from DB:", now)
+}
+
 func main() {
-	// Try to get the full DSN first
 	dsn := os.Getenv("DATABASE_URL")
 
-	// If PG_DSN is not set, construct it from individual parts
 	if dsn == "" {
 		user := getEnv("DB_USER", "postgres")
 		password := getEnv("DB_PASSWORD", "password")
@@ -32,18 +67,12 @@ func main() {
 		sslmode := getEnv("DB_SSLMODE", "disable")
 
 		dsn = fmt.Sprintf("postgresql://%s:%s@%s:%s/%s?sslmode=%s",
-											user, password, host, port, database, sslmode)
+			user, password, host, port, database, sslmode)
 	}
 
-	// Connect to the database
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
-	if err != nil {
-		log.Fatal("failed to connect to database:", err)
+	if isMongoURI(dsn) {
+		connectMongo(dsn)
+	} else {
+		connectPostgres(dsn)
 	}
-
-	// Query current time
-	var now time.Time
-	db.Raw("SELECT NOW()").Scan(&now)
-
-	fmt.Println("Current time from DB:", now)
 }
